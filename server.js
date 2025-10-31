@@ -1,14 +1,14 @@
 import express from 'express';
-import axios from 'axios';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import nutritionRoutes from './routes/nutrition.routes.js';
 
 // --- Configuration ---
 dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
-const geminiApiKey = process.env.GEMINI_API_KEY;
-const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+
+// --- Middleware ---
 // const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
 
 // --- System Prompt ---
@@ -57,49 +57,11 @@ app.use(express.json()); // To parse JSON request bodies
 app.use(cors()); // Enable CORS for all origins (required for Flutter)
 
 // --- Routes ---
-app.post('/nutrition', async (req, res) => {
-  const { food } = req.body;
+app.use('/nutrition', nutritionRoutes);
 
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY is not set on the server.' });
-  }
-
-  if (!food) {
-    return res.status(400).json({ error: 'Missing "food" field in request body.' });
-  }
-
-  // Construct the payload for the Gemini API
-  const geminiPayload = {
-    contents: [{
-      parts: [{ text: food }]
-    }],
-    systemInstruction: {
-      parts: [{ text: systemPrompt }]
-    },
-    generationConfig: {
-      responseMimeType: "application/json",
-    }
-  };
-
-  try {
-    // Call the Gemini API
-    const apiResponse = await axios.post(geminiApiUrl, geminiPayload, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    // Extract the raw JSON string from Gemini's response
-    const nutritionJsonString = apiResponse.data.candidates[0].content.parts[0].text;
-    
-    // Parse the JSON string to validate it and send it as a proper JSON response
-    const nutritionData = JSON.parse(nutritionJsonString);
-    
-    // Send the extracted JSON object back to the client
-    res.json(nutritionData);
-
-  } catch (error) {
-    console.error('Error calling Gemini API:', error.response ? error.response.data : error.message);
-    res.status(500).json({ error: 'Failed to fetch nutrition data from Gemini API.' });
-  }
+// --- Health Check Route ---
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
 });
 
 // --- Start Server ---
