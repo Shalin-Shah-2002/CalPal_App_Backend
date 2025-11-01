@@ -2,6 +2,9 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import nutritionRoutes from './routes/nutrition.routes.js';
+import saveNutritionRoutes from './routes/saveNutrition.routes.js';
+import { testConnection } from './config/database.js';
+import { initializeDatabase } from './config/initDb.js';
 
 // --- Configuration ---
 dotenv.config();
@@ -52,12 +55,13 @@ Rules:
 - Use realistic average nutritional values per 100g.
 `;
 
-// --- Middleware ---
+// --- Middleware ---   
 app.use(express.json()); // To parse JSON request bodies
 app.use(cors()); // Enable CORS for all origins (required for Flutter)
 
 // --- Routes ---
-app.use('/nutrition', nutritionRoutes);
+app.use('/nutrition', nutritionRoutes);       // Get nutrition data from Gemini AI
+app.use('/save', saveNutritionRoutes);        // Save/retrieve nutrition data to/from database
 
 // --- Health Check Route ---
 app.get('/health', (req, res) => {
@@ -65,7 +69,13 @@ app.get('/health', (req, res) => {
 });
 
 // --- Start Server ---
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`✅ Node.js server running on http://localhost:${port}`);
   console.log('CORS is enabled for all origins.');
+  
+  // Test database connection on server start
+  await testConnection();
+  
+  // Initialize database tables
+  await initializeDatabase();
 });

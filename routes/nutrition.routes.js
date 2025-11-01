@@ -69,7 +69,6 @@ router.post('/', async (req, res) => {
       responseMimeType: "application/json",
     }
   };
-
   try {
     // Call the Gemini API
     const apiResponse = await axios.post(geminiApiUrl, geminiPayload, {
