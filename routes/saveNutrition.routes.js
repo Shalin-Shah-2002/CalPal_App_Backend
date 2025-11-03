@@ -3,7 +3,7 @@ import pool from '../config/database.js';
 
 const router = express.Router();
 
-// --- POST / - Save nutrition data to database ---
+// --- POST / - Save nutrition data to database --- 
 router.post('/', async (req, res) => {
   const nutritionData = req.body;
 
