@@ -1,57 +1,105 @@
 version: '3.8'
 
 services:
+  # ============================================
   # Node.js Backend Service
+  # ============================================
   backend:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    image: calorie-tracking-backend:latest
     container_name: calorie-tracking-backend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/calorie_tracker}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TZ=UTC
     volumes:
-      - ./logs:/app/logs
+      - ./logs:/app/logs:rw
     networks:
       - app-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  # PostgreSQL Database Service (optional - use if not using external DB)
+  # ============================================
+  # PostgreSQL Database Service
+  # ============================================
   postgres:
     image: postgres:15-alpine
     container_name: calorie-tracking-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=calorie_tracker
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-calorie_tracker}
+      - PGDATA=/var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./config/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ============================================
+  # pgAdmin (Optional - for database management)
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: calorie-tracking-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@calpal.com}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+      - PGADMIN_LISTEN_PORT=80
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+    profiles:
+      - tools
 
 networks:
   app-network:
     driver: bridge
+    name: calorie-tracking-network
 
 volumes:
   postgres-data:
+    name: calorie-tracking-postgres-data
+  pgadmin-data:
+    name: calorie-tracking-pgadmin-data
