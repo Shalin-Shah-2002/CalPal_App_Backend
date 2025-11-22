@@ -33,6 +33,11 @@ CREATE TABLE IF NOT EXISTS nutrition_logs (
 );
 
 -- Create indexes for faster queries
+-- Ensure user_id exists on existing tables (protects against previously created tables
+-- that lacked the column). This makes running the full schema idempotent.
+ALTER TABLE nutrition_logs
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+
 CREATE INDEX IF NOT EXISTS idx_users_appwrite_id ON users(appwrite_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_nutrition_user_id ON nutrition_logs(user_id);
