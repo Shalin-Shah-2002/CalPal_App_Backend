@@ -1,5 +1,58 @@
 # Code Updates and Azure Deployment - Complete Guide
 
+---
+
+## 🔧 Recent Database Schema Updates (Nov 22, 2025)
+
+### Issue Fixed: Database Initialization Errors
+
+**Problems Encountered:**
+1. ❌ `column "user_id" does not exist` error on local and Render deployments
+2. ❌ `trigger "update_users_updated_at" already exists` error on Render
+
+**Root Cause:**
+- Schema file (`config/schema.sql`) wasn't idempotent
+- Running initialization multiple times or on existing databases would fail
+- `CREATE TABLE IF NOT EXISTS` doesn't add missing columns to existing tables
+- Trigger creation would fail if trigger already existed
+
+**Solutions Applied:**
+
+✅ **Added idempotent column creation:**
+```sql
+-- Ensures user_id exists on existing tables
+ALTER TABLE nutrition_logs
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+```
+
+✅ **Added idempotent trigger creation:**
+```sql
+-- Drop trigger if it exists before creating
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+**Benefits:**
+- ✅ Schema can be run multiple times safely
+- ✅ Works on fresh databases and existing databases
+- ✅ No manual migrations needed for missing columns/triggers
+- ✅ Deployments to Render/Azure succeed consistently
+
+**Migration Recommendations for Production:**
+- Always back up database before running schema updates
+- Test schema changes on staging environment first
+- Consider using migration tools (e.g., node-pg-migrate, Flyway) for complex databases
+- Document each schema version in a migrations table
+
+**Verified Working:**
+- ✅ Local development (tested Nov 22, 2025)
+- ✅ Render deployment (live at https://calpal-app-backend.onrender.com)
+- ✅ Ready for Azure Container Apps deployment
+
+---
+
 ## ❓ Will My Code Update Automatically in Azure?
 
 **Short Answer:** **NO** - By default, code updates are **NOT automatic**.
